@@ -4,151 +4,243 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Wheel Strategy Backtest</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.2/plotly.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script>window.Plotly || document.write('<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"><\/script>')</script>
+<script src="book.js"></script>
 <style>
-  :root {
-    --bg1: #0b1426; --bg2: #13233f; --panel: #0f1c33; --line: #24385c;
-    --text: #e6ecf5; --muted: #8fa3c2; --amber: #f2b33d; --green: #4fd18b; --red: #ff6b6b;
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; color: var(--text); font-family: -apple-system, Segoe UI, Roboto, sans-serif;
-         background: linear-gradient(160deg, var(--bg1), var(--bg2)) fixed; line-height: 1.55; }
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 16px 64px; }
-  h1, h2 { font-family: Georgia, serif; color: var(--amber); font-weight: normal; }
-  h1 { font-size: 2.2rem; margin: 0 0 4px; }
-  h2 { font-size: 1.45rem; margin: 40px 0 12px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
-  .sub { color: var(--muted); margin: 0 0 24px; }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
-  .pending { border: 1px dashed var(--amber); color: var(--muted); padding: 14px; border-radius: 8px; }
-  .banner { background: #5a1b1b; color: #ffd6d6; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; display: none; }
-  nav a { color: var(--muted); margin-right: 18px; text-decoration: none; }
-  nav a:hover { color: var(--amber); }
-  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-  th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
-  th:first-child, td:first-child { text-align: left; }
-  th { color: var(--amber); font-weight: normal; position: sticky; top: 0; background: var(--panel); }
-  .scroll { max-height: 420px; overflow: auto; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
-  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
-  .stat .k { color: var(--muted); font-size: 0.8rem; } .stat .v { font-size: 1.3rem; }
-  input[type=date] { background: var(--panel); color: var(--text); border: 1px solid var(--line); padding: 6px; border-radius: 4px; }
-  .chart { height: 420px; }
-  footer { color: var(--muted); margin-top: 48px; font-size: 0.85rem; }
-  footer a, .prose a { color: var(--amber); }
-  .prose p { margin: 0 0 12px; }
+  :root { --bg1:#0b1426; --bg2:#13233f; --panel:#0f1c33; --line:#24385c; --text:#e6ecf5; --muted:#8fa3c2;
+          --amber:#f2b33d; --green:#4fd18b; --red:#ff6b6b; --blue:#6fa8ff; }
+  * { box-sizing:border-box; }
+  html { background:#0b1426; }
+  body { margin:0; color:var(--text); font-family:-apple-system,"Segoe UI",Roboto,sans-serif; line-height:1.55;
+         background:linear-gradient(160deg,var(--bg1),var(--bg2)) fixed; }
+  .wrap { max-width:1180px; margin:0 auto; padding:32px 16px 64px; }
+  h1,h2,h3 { font-family:Georgia,serif; color:var(--amber); font-weight:normal; }
+  h1 { font-size:2.3rem; margin:0 0 4px; }
+  h2 { font-size:1.5rem; margin:44px 0 12px; border-bottom:1px solid var(--line); padding-bottom:6px; }
+  h3 { font-size:1.1rem; margin:22px 0 8px; }
+  .sub { color:var(--muted); margin:0 0 10px; font-size:.92rem; }
+  nav { margin:14px 0 6px; } nav a { color:var(--muted); margin-right:16px; text-decoration:none; font-size:.92rem; }
+  nav a:hover { color:var(--amber); }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px; margin-top:12px; }
+  .banner { background:#5a1b1b; color:#ffd6d6; padding:10px 14px; border-radius:6px; margin-bottom:16px; font-weight:bold; }
+  .pending { border:1px dashed var(--amber); color:var(--muted); padding:14px; border-radius:8px; }
+  .prose p { margin:0 0 12px; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-top:18px; }
+  .tile { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px; }
+  .tile .k { color:var(--muted); font-size:.78rem; } .tile .v { font-size:1.35rem; margin-top:2px; }
+  table { width:100%; border-collapse:collapse; font-size:.86rem; }
+  th,td { padding:6px 8px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+  th:first-child,td:first-child { text-align:left; }
+  th { color:var(--amber); font-weight:normal; position:sticky; top:0; background:var(--panel); }
+  table.kv td { white-space:normal; } table.kv td:first-child { color:var(--muted); width:34%; }
+  .scroll { max-height:440px; overflow:auto; }
+  .xscroll { overflow-x:auto; }
+  .chart { height:440px; } .chart.short { height:300px; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; } @media (max-width:860px){ .two{grid-template-columns:1fr;} }
+  .yes { color:var(--green); } .no { color:var(--red); }
+  select, input { background:var(--panel); color:var(--text); border:1px solid var(--line); padding:6px; border-radius:4px; }
+  input[type=range] { width:100%; padding:0; }
+  .controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  a { color:var(--amber); }
+  footer { color:var(--muted); margin-top:48px; font-size:.85rem; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div id="synth" class="banner">SYNTHETIC DATA: pipeline test output, not a real backtest.</div>
+  <div id="synth" class="banner" style="display:none">SYNTHETIC DATA: pipeline dry run, not a real backtest. Do not publish.</div>
   <h1>Wheel Strategy Backtest</h1>
-  <p class="sub" id="meta">FINTECH 535 · Pau Pinya Nadal</p>
-  <nav><a href="#thesis">Thesis</a><a href="#perf">Performance</a><a href="#portfolio">Portfolio</a><a href="#blotter">Blotter</a><a href="#ledger">Ledger</a><a href="#fills">Fills</a><a href="#verdict">Verdict</a></nav>
+  <p class="sub" id="meta"></p>
+  <nav><a href="#thesis">Thesis</a><a href="#trades">Trades</a><a href="#perf">Performance</a><a href="#portfolio">Portfolio</a>
+       <a href="#blotter">Blotter</a><a href="#ledger">Ledger</a><a href="#fills">Fills</a><a href="#where">Where the P&amp;L came from</a>
+       <a href="#reflection">Reflection</a></nav>
+  <div class="tiles" id="tiles"></div>
+  <div class="panel"><table class="kv" id="t-setup"></table></div>
 
   <h2 id="thesis">Thesis</h2>
   <div class="prose" id="c-thesis"></div>
+  <h3>Did it hold?</h3>
+  <div class="panel xscroll"><table id="t-tests"></table></div>
+
+  <h2 id="trades">Every option, on the price</h2>
+  <p class="sub">Green: short puts. Amber: covered calls. Shaded: holding shares.</p>
+  <div class="panel"><div id="c-price" class="chart"></div></div>
 
   <h2 id="perf">Performance</h2>
-  <div class="grid" id="stats"></div>
-  <div class="panel" style="margin-top:12px"><div id="nav-chart" class="chart"></div></div>
-  <div class="panel scroll" style="margin-top:12px"><table id="metrics"></table></div>
+  <div class="panel"><div id="c-nav" class="chart"></div></div>
+  <div class="panel"><div id="c-dd" class="chart short"></div></div>
+  <div class="panel xscroll"><table id="t-metrics"></table></div>
+  <div class="panel"><table class="kv" id="t-stats"></table></div>
 
   <h2 id="portfolio">Portfolio at any date</h2>
-  <p>Pick a date: <input type="date" id="pdate"></p>
-  <div id="pview"></div>
+  <div class="controls"><input type="date" id="pdate"><span class="sub" id="pinfo"></span></div>
+  <input type="range" id="pslider" min="0" value="0" style="margin-top:10px">
+  <div class="tiles" id="ptiles"></div>
+  <div class="panel"><table class="kv" id="popt"></table></div>
 
   <h2 id="blotter">Blotter</h2>
-  <p class="sub">Every open, close, assignment, call-away and roll. <a href="data/blotter.csv" style="color:var(--amber)">Download CSV</a></p>
+  <div class="controls"><select id="bfilter"><option value="">All events</option></select>
+    <a href="data/blotter.csv">blotter.csv</a><a href="data/options.csv">options.csv</a></div>
   <div class="panel scroll"><table id="t-blotter"></table></div>
 
   <h2 id="ledger">Ledger</h2>
-  <p class="sub">End-of-day cash, positions and NAV. <a href="data/ledger.csv" style="color:var(--amber)">Download CSV</a></p>
+  <div class="controls"><a href="data/ledger.csv">ledger.csv</a></div>
   <div class="panel scroll"><table id="t-ledger"></table></div>
 
-  <h2 id="fills">Fill-price assumptions</h2>
-  <div class="prose" id="c-fills"></div>
+  <h2 id="fills">Fill-price assumption</h2>
+  <p class="sub">Fill = (BID + ASK) / 2 of the entry-day closing quote. Evidence: same-day trade prints vs quotes on near-the-money contracts, days with volume only.</p>
+  <div class="panel xscroll"><table id="t-fill"></table></div>
+  <div class="two">
+    <div class="panel"><div id="c-fill" class="chart"></div></div>
+    <div class="panel"><table class="kv" id="t-fillfacts"></table><h3>Sensitivity</h3><table id="t-sens"></table></div>
+  </div>
 
-  <h2 id="verdict">Did it work?</h2>
-  <div class="prose" id="c-verdict"></div>
+  <h2 id="where">Where the P&amp;L came from</h2>
+  <div class="two">
+    <div class="panel"><div id="c-attr" class="chart"></div></div>
+    <div class="panel"><div id="c-vol" class="chart"></div></div>
+  </div>
+  <div class="panel"><div id="c-weekly" class="chart short"></div></div>
+  <h3>Wheel cycles</h3>
+  <p class="sub">One row per turn: first put sold while flat, to shares called away. <a href="data/cycles.csv">cycles.csv</a></p>
+  <div class="panel scroll"><table id="t-cycles"></table></div>
 
-  <footer>Code and data: <a id="repo" href="#">GitHub repository</a> · Data source: LSEG Workspace</footer>
+  <h2 id="reflection">Reflection</h2>
+  <div class="prose" id="c-reflection"></div>
+
+  <footer>Data: LSEG Workspace · <span id="built"></span></footer>
 </div>
-
 <script>
-const PENDING = '<div class="pending">Pending: backtest not run yet.</div>';
-const LAYOUT = { paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#e6ecf5' },
-  margin: { l: 60, r: 20, t: 30, b: 40 }, legend: { orientation: 'h', y: 1.08 },
-  xaxis: { gridcolor: '#24385c' }, yaxis: { gridcolor: '#24385c', title: 'NAV ($)' } };
+const B = window.BOOK, M = B.meta;
+const AMB='#f2b33d', GRN='#4fd18b', RED='#ff6b6b', BLU='#6fa8ff', GRY='#9aa7bd', TXT='#e6ecf5', GRID='#24385c';
+const CFG = { responsive:true, displaylogo:false };
+function L(extra){ return Object.assign({ paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'#0a1222', font:{color:TXT, size:12},
+  margin:{l:64,r:20,t:40,b:80}, legend:{orientation:'h', x:0, y:-0.16, yanchor:'top'}, hovermode:'x unified',
+  xaxis:{gridcolor:GRID, zeroline:false}, yaxis:{gridcolor:GRID, zeroline:false} }, extra||{}); }
+const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const money = v => v==null ? '' : (v<0?'-':'') + '$' + Math.abs(v).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
+const fmt = v => typeof v === 'number' ? v.toLocaleString(undefined,{maximumFractionDigits:4}) : esc(v);
+const prose = t => t ? t.split(/\n\n+/).map(p => '<p>'+esc(p)+'</p>').join('') : '<div class="pending">Not written yet.</div>';
 
-async function getJSON(p) { try { const r = await fetch(p, { cache: 'no-store' }); return r.ok ? r.json() : null; } catch (e) { return null; } }
-async function getCSV(p) {
-  try { const r = await fetch(p, { cache: 'no-store' }); if (!r.ok) return null;
-        return Papa.parse(await r.text(), { header: true, dynamicTyping: true, skipEmptyLines: true }).data; }
-  catch (e) { return null; }
-}
-const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-const fmt = v => typeof v === 'number' ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : esc(v);
-const prose = t => t ? t.split(/\n\n+/).map(p => '<p>' + esc(p) + '</p>').join('') : PENDING;
-
-function table(el, rows) {
-  if (!rows || !rows.length) { el.outerHTML = PENDING; return; }
+function table(id, rows, cls){
+  const el = document.getElementById(id);
+  if (!rows || !rows.length){ el.innerHTML = '<tr><td>No rows</td></tr>'; return; }
   const cols = Object.keys(rows[0]);
-  el.innerHTML = '<thead><tr>' + cols.map(c => '<th>' + esc(c) + '</th>').join('') + '</tr></thead><tbody>' +
-    rows.map(r => '<tr>' + cols.map(c => '<td>' + fmt(r[c]) + '</td>').join('') + '</tr>').join('') + '</tbody>';
+  el.innerHTML = '<thead><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr></thead><tbody>'+
+    rows.map(r=>'<tr>'+cols.map(c=>{ const v=r[c]; const k = cls&&cls(c,v); return '<td'+(k?' class="'+k+'"':'')+'>'+fmt(v)+'</td>'; }).join('')+'</tr>').join('')+'</tbody>';
 }
+function kv(id, pairs){ document.getElementById(id).innerHTML = pairs.map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+fmt(v)+'</td></tr>').join(''); }
+function tiles(id, pairs){ document.getElementById(id).innerHTML = pairs.map(([k,v])=>'<div class="tile"><div class="k">'+esc(k)+'</div><div class="v">'+esc(v)+'</div></div>').join(''); }
 
-function showPortfolio(positions, date) {
-  const el = document.getElementById('pview');
-  const dates = Object.keys(positions).sort();
-  let d = dates.filter(x => x <= date).pop() || dates[0];
-  const p = positions[d];
-  const legs = [...(p.puts || []), ...(p.calls || [])];
-  el.innerHTML = '<p class="sub">Showing close of ' + d + '</p><div class="grid">' +
-    [['Cash', p.cash], ['Shares', p.shares], ['Share value', p.share_value], ['Options value', p.option_value], ['NAV', p.nav]]
-      .map(([k, v]) => '<div class="stat"><div class="k">' + k + '</div><div class="v">' + fmt(v) + '</div></div>').join('') + '</div>' +
-    (legs.length ? '<div class="panel" style="margin-top:12px"><table id="t-legs"></table></div>' : '<p class="sub" style="margin-top:12px">No open option positions.</p>');
-  if (legs.length) table(document.getElementById('t-legs'), legs);
-}
+// ---------------------------------------------------------------- header
+if (M.synthetic) document.getElementById('synth').style.display='block';
+document.getElementById('meta').textContent = `FINTECH 535 · ${M.author} · ${M.ticker} · ${M.start} to ${M.end}`;
+document.getElementById('built').textContent = 'Built ' + M.built;
+tiles('tiles', B.tiles);
+kv('t-setup', B.setup);
+document.getElementById('c-thesis').innerHTML = prose(B.commentary.thesis);
+document.getElementById('c-reflection').innerHTML = prose(B.commentary.reflection);
+table('t-tests', B.tests, (c,v)=> c==='Held?' ? (v==='Yes'?'yes':'no') : '');
 
-(async () => {
-  const [summary, nav, blotter, ledger, positions] = await Promise.all([
-    getJSON('data/summary.json'), getCSV('data/nav.csv'), getCSV('data/blotter.csv'),
-    getCSV('data/ledger.csv'), getJSON('data/positions.json')]);
-
-  const s = summary || {}, c = s.commentary || {}, m = s.meta || {};
-  if (m.synthetic) document.getElementById('synth').style.display = 'block';
-  if (m.ticker) document.getElementById('meta').textContent = `FINTECH 535 · Pau Pinya Nadal · ${m.ticker} · ${m.start} to ${m.end}`;
-  if (m.repo) document.getElementById('repo').href = m.repo;
-  document.getElementById('c-thesis').innerHTML = prose(c.thesis);
-  document.getElementById('c-fills').innerHTML = prose(c.fills);
-  document.getElementById('c-verdict').innerHTML = prose(c.verdict);
-
-  if (s.metrics && s.metrics.length) {
-    table(document.getElementById('metrics'), s.metrics);
-    const w = s.metrics[0];
-    document.getElementById('stats').innerHTML = Object.entries(w).slice(1, 6)
-      .map(([k, v]) => '<div class="stat"><div class="k">' + esc(k) + '</div><div class="v">' + fmt(v) + '</div></div>').join('');
-  } else { document.getElementById('metrics').outerHTML = PENDING; }
-
-  if (nav && nav.length) {
-    const cols = Object.keys(nav[0]).filter(k => k !== 'date');
-    const colors = ['#f2b33d', '#4fd18b', '#6fa8ff', '#ff6b6b'];
-    Plotly.newPlot('nav-chart', cols.map((k, i) => ({ x: nav.map(r => r.date), y: nav.map(r => r[k]), name: k,
-      type: 'scatter', mode: 'lines', line: { width: 3, color: colors[i % 4] } })), LAYOUT, { responsive: true, displaylogo: false });
-  } else { document.getElementById('nav-chart').outerHTML = PENDING; }
-
-  table(document.getElementById('t-blotter'), blotter);
-  table(document.getElementById('t-ledger'), ledger);
-
-  const pd = document.getElementById('pdate');
-  if (positions && Object.keys(positions).length) {
-    const ds = Object.keys(positions).sort();
-    pd.min = ds[0]; pd.max = ds[ds.length - 1]; pd.value = ds[ds.length - 1];
-    showPortfolio(positions, pd.value);
-    pd.addEventListener('change', () => showPortfolio(positions, pd.value));
-  } else { pd.disabled = true; document.getElementById('pview').innerHTML = PENDING; }
+// ---------------------------------------------------------------- price + strikes
+const S = B.series;
+(function(){
+  const tr = [{x:S.dates, y:S.close, name:M.ticker+' close', type:'scatter', mode:'lines', line:{color:TXT, width:2}}];
+  for (const cp of ['P','C']){
+    const xs=[], ys=[];
+    B.legs.filter(l=>l.cp===cp).forEach(l=>{ xs.push(l.s,l.e,null); ys.push(l.k,l.k,null); });
+    tr.push({x:xs, y:ys, name: cp==='P'?'Short put strike':'Covered call strike', type:'scatter', mode:'lines',
+             line:{color: cp==='P'?GRN:AMB, width:4}, connectgaps:false, hoverinfo:'skip'});
+  }
+  const pa = B.blotter.filter(r=>r.event==='PUT_ASSIGNED'), ca = B.blotter.filter(r=>r.event==='CALL_ASSIGNED');
+  tr.push({x:pa.map(r=>r.date), y:pa.map(r=>r.strike), name:'Put assigned (bought 100)', mode:'markers', type:'scatter',
+           marker:{symbol:'triangle-down', size:13, color:RED, line:{color:'#000', width:1}}});
+  tr.push({x:ca.map(r=>r.date), y:ca.map(r=>r.strike), name:'Called away (sold 100)', mode:'markers', type:'scatter',
+           marker:{symbol:'triangle-up', size:13, color:BLU, line:{color:'#000', width:1}}});
+  const shapes=[]; let st=null;
+  S.phase.forEach((p,i)=>{ if(p==='SHARES' && st===null) st=i;
+    if((p!=='SHARES' || i===S.phase.length-1) && st!==null){ shapes.push({type:'rect', xref:'x', yref:'paper', x0:S.dates[st], x1:S.dates[i], y0:0, y1:1,
+      fillcolor:'rgba(242,179,61,0.10)', line:{width:0}, layer:'below'}); st=null; } });
+  Plotly.newPlot('c-price', tr, L({shapes, yaxis:{gridcolor:GRID, tickprefix:'$'}, hovermode:'closest', margin:{l:64,r:20,t:20,b:80}}), CFG);
 })();
+
+// ---------------------------------------------------------------- NAV + drawdown
+(function(){
+  const col = {'Wheel':AMB, 'Wheel, fills at bid':AMB, 'AMZN buy & hold':BLU}; col[M.bench]=GRY;
+  const tr = Object.entries(S.navs).map(([k,v])=>({x:S.dates, y:v, name:k, type:'scatter', mode:'lines',
+    line:{color:col[k]||GRY, width: k==='Wheel'?4:2.5, dash: k.includes('bid')?'dot':'solid'}}));
+  Plotly.newPlot('c-nav', tr, L({title:{text:'NAV ($)', font:{size:14}}, yaxis:{gridcolor:GRID, tickprefix:'$'}}), CFG);
+  const dd = Object.entries(S.navs).filter(([k])=>!k.includes('bid')).map(([k,v])=>{ let pk=-Infinity;
+    return {x:S.dates, y:v.map(x=>{ pk=Math.max(pk,x); return 100*(x/pk-1); }), name:k, type:'scatter', mode:'lines',
+            line:{color:col[k]||GRY, width:k==='Wheel'?3:2}}; });
+  Plotly.newPlot('c-dd', dd, L({title:{text:'Drawdown (%)', font:{size:14}}, yaxis:{gridcolor:GRID, ticksuffix:'%'}}), CFG);
+})();
+table('t-metrics', B.metrics);
+kv('t-stats', B.wheel_stats);
+
+// ---------------------------------------------------------------- portfolio at a date
+(function(){
+  const rows = B.ledger, sl = document.getElementById('pslider'), dp = document.getElementById('pdate');
+  sl.max = rows.length-1; sl.value = rows.length-1; dp.min = rows[0].date; dp.max = rows[rows.length-1].date;
+  function show(i){
+    const r = rows[i]; dp.value = r.date; sl.value = i;
+    document.getElementById('pinfo').textContent = 'Close of ' + r.date + ' · phase: ' + r.phase;
+    tiles('ptiles', [['Cash', money(r.cash)], ['Shares', String(r.shares)], ['Share value', money(r.stock_value)],
+      ['Short option (liability)', money(r.opt_liability)], ['NAV', money(r.nav)], ['Premium to date', money(r.cum_premium)],
+      ['Interest to date', money(r.cum_interest)]]);
+    kv('popt', r.option ? [['Open option', r.option], ['Type', r.opt_cp==='P' ? 'Short put (cash-secured)' : 'Covered call'],
+      ['Strike', money(r.opt_strike)], ['Expiry', r.opt_expiry], ['Mark (per share)', money(r.opt_mark)], ['AMZN close', money(r.close)]]
+      : [['Open option', 'None (expiry day or skipped week)'], ['AMZN close', money(r.close)]]);
+  }
+  sl.addEventListener('input', ()=>show(+sl.value));
+  dp.addEventListener('change', ()=>{ let i = rows.findIndex(r=>r.date>=dp.value); if(i<0) i=rows.length-1;
+    if (rows[i].date>dp.value && i>0) i--; show(i); });
+  show(rows.length-1);
+})();
+
+// ---------------------------------------------------------------- blotter / ledger
+(function(){
+  const sel = document.getElementById('bfilter');
+  [...new Set(B.blotter.map(r=>r.event))].forEach(e=>{ const o=document.createElement('option'); o.value=e; o.textContent=e; sel.appendChild(o); });
+  const render = ()=> table('t-blotter', B.blotter.filter(r=>!sel.value || r.event===sel.value));
+  sel.addEventListener('change', render); render();
+  table('t-ledger', B.ledger);
+})();
+
+// ---------------------------------------------------------------- fills
+table('t-fill', B.fill_rows);
+kv('t-fillfacts', B.fill_facts);
+table('t-sens', B.sensitivity);
+(function(){
+  const tr=[]; let mx=0;
+  for (const [cp,c] of [['P',GRN],['C',AMB]]){ const p=B.fill_pts[cp]; if(!p) continue;
+    mx=Math.max(mx, ...p.x, ...p.y);
+    tr.push({x:p.x, y:p.y, name: cp==='P'?'Puts':'Calls', mode:'markers', type:'scatter', marker:{color:c, size:5, opacity:.55}}); }
+  tr.push({x:[0,mx], y:[0,mx], name:'trade = mid', mode:'lines', line:{color:TXT, dash:'dash', width:2}});
+  Plotly.newPlot('c-fill', tr, L({title:{text:'Time value: trade vs mid ($)', font:{size:14}}, hovermode:'closest',
+    xaxis:{gridcolor:GRID, title:'mid − intrinsic'}, yaxis:{gridcolor:GRID, title:'trade − intrinsic'}}), CFG);
+})();
+
+// ---------------------------------------------------------------- attribution, vol, weekly
+(function(){
+  const a = B.attribution;
+  Plotly.newPlot('c-attr', [{x:a.map(r=>r[0]), y:a.map(r=>r[1]), type:'bar', text:a.map(r=>money(r[1])), textposition:'outside',
+    marker:{color:a.map(r=> r[0]==='Total'?AMB:(r[1]>=0?GRN:RED))}}],
+    L({title:{text:'P&L attribution ($)', font:{size:14}}, showlegend:false, hovermode:'closest', margin:{l:64,r:20,t:40,b:100},
+       yaxis:{gridcolor:GRID, tickprefix:'$'}}), CFG);
+  const tr=[]; let mx=0;
+  for (const [cp,c] of [['P',GRN],['C',AMB]]){ const p=B.vol_pts[cp]; if(!p) continue; mx=Math.max(mx,...p.x,...p.y);
+    tr.push({x:p.x, y:p.y, text:p.t, name: cp==='P'?'Puts':'Calls', mode:'markers', type:'scatter', marker:{color:c, size:8, opacity:.8},
+             hovertemplate:'%{text}<br>implied %{x:.2f}%<br>realized %{y:.2f}%<extra></extra>'}); }
+  tr.push({x:[0,mx], y:[0,mx], name:'realized = implied', mode:'lines', line:{color:TXT, dash:'dash', width:2}});
+  Plotly.newPlot('c-vol', tr, L({title:{text:'Implied vs realized move per option (%)', font:{size:14}}, hovermode:'closest',
+    xaxis:{gridcolor:GRID, title:'expected |move| implied by IV'}, yaxis:{gridcolor:GRID, title:'realized |move| to expiry'}}), CFG);
+  const wt = Object.entries(B.weekly).map(([k,v])=>({x:v, name:k, type:'histogram', opacity:.65, xbins:{size:0.5},
+    marker:{color: k==='Wheel'?AMB:BLU}}));
+  Plotly.newPlot('c-weekly', wt, L({title:{text:'Weekly returns (%)', font:{size:14}}, barmode:'overlay', hovermode:'closest',
+    xaxis:{gridcolor:GRID, ticksuffix:'%'}, yaxis:{gridcolor:GRID, title:'weeks'}}), CFG);
+})();
+table('t-cycles', B.cycles);
 </script>
 </body>
 </html>
