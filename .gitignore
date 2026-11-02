@@ -1,0 +1,6 @@
+lseg-data.config.json
+*.pkl
+raw_cache/
+.venv/
+__pycache__/
+site_synthetic/

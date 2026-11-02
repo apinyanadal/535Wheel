@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wheel Strategy Backtest</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.2/plotly.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root {
+    --bg1: #0b1426; --bg2: #13233f; --panel: #0f1c33; --line: #24385c;
+    --text: #e6ecf5; --muted: #8fa3c2; --amber: #f2b33d; --green: #4fd18b; --red: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: var(--text); font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+         background: linear-gradient(160deg, var(--bg1), var(--bg2)) fixed; line-height: 1.55; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1, h2 { font-family: Georgia, serif; color: var(--amber); font-weight: normal; }
+  h1 { font-size: 2.2rem; margin: 0 0 4px; }
+  h2 { font-size: 1.45rem; margin: 40px 0 12px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+  .pending { border: 1px dashed var(--amber); color: var(--muted); padding: 14px; border-radius: 8px; }
+  .banner { background: #5a1b1b; color: #ffd6d6; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; display: none; }
+  nav a { color: var(--muted); margin-right: 18px; text-decoration: none; }
+  nav a:hover { color: var(--amber); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--amber); font-weight: normal; position: sticky; top: 0; background: var(--panel); }
+  .scroll { max-height: 420px; overflow: auto; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  .stat .k { color: var(--muted); font-size: 0.8rem; } .stat .v { font-size: 1.3rem; }
+  input[type=date] { background: var(--panel); color: var(--text); border: 1px solid var(--line); padding: 6px; border-radius: 4px; }
+  .chart { height: 420px; }
+  footer { color: var(--muted); margin-top: 48px; font-size: 0.85rem; }
+  footer a, .prose a { color: var(--amber); }
+  .prose p { margin: 0 0 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="synth" class="banner">SYNTHETIC DATA: pipeline test output, not a real backtest.</div>
+  <h1>Wheel Strategy Backtest</h1>
+  <p class="sub" id="meta">FINTECH 535 · Pau Pinya Nadal</p>
+  <nav><a href="#thesis">Thesis</a><a href="#perf">Performance</a><a href="#portfolio">Portfolio</a><a href="#blotter">Blotter</a><a href="#ledger">Ledger</a><a href="#fills">Fills</a><a href="#verdict">Verdict</a></nav>
+
+  <h2 id="thesis">Thesis</h2>
+  <div class="prose" id="c-thesis"></div>
+
+  <h2 id="perf">Performance</h2>
+  <div class="grid" id="stats"></div>
+  <div class="panel" style="margin-top:12px"><div id="nav-chart" class="chart"></div></div>
+  <div class="panel scroll" style="margin-top:12px"><table id="metrics"></table></div>
+
+  <h2 id="portfolio">Portfolio at any date</h2>
+  <p>Pick a date: <input type="date" id="pdate"></p>
+  <div id="pview"></div>
+
+  <h2 id="blotter">Blotter</h2>
+  <p class="sub">Every open, close, assignment, call-away and roll. <a href="data/blotter.csv" style="color:var(--amber)">Download CSV</a></p>
+  <div class="panel scroll"><table id="t-blotter"></table></div>
+
+  <h2 id="ledger">Ledger</h2>
+  <p class="sub">End-of-day cash, positions and NAV. <a href="data/ledger.csv" style="color:var(--amber)">Download CSV</a></p>
+  <div class="panel scroll"><table id="t-ledger"></table></div>
+
+  <h2 id="fills">Fill-price assumptions</h2>
+  <div class="prose" id="c-fills"></div>
+
+  <h2 id="verdict">Did it work?</h2>
+  <div class="prose" id="c-verdict"></div>
+
+  <footer>Code and data: <a id="repo" href="#">GitHub repository</a> · Data source: LSEG Workspace</footer>
+</div>
+
+<script>
+const PENDING = '<div class="pending">Pending: backtest not run yet.</div>';
+const LAYOUT = { paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#e6ecf5' },
+  margin: { l: 60, r: 20, t: 30, b: 40 }, legend: { orientation: 'h', y: 1.08 },
+  xaxis: { gridcolor: '#24385c' }, yaxis: { gridcolor: '#24385c', title: 'NAV ($)' } };
+
+async function getJSON(p) { try { const r = await fetch(p, { cache: 'no-store' }); return r.ok ? r.json() : null; } catch (e) { return null; } }
+async function getCSV(p) {
+  try { const r = await fetch(p, { cache: 'no-store' }); if (!r.ok) return null;
+        return Papa.parse(await r.text(), { header: true, dynamicTyping: true, skipEmptyLines: true }).data; }
+  catch (e) { return null; }
+}
+const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const fmt = v => typeof v === 'number' ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : esc(v);
+const prose = t => t ? t.split(/\n\n+/).map(p => '<p>' + esc(p) + '</p>').join('') : PENDING;
+
+function table(el, rows) {
+  if (!rows || !rows.length) { el.outerHTML = PENDING; return; }
+  const cols = Object.keys(rows[0]);
+  el.innerHTML = '<thead><tr>' + cols.map(c => '<th>' + esc(c) + '</th>').join('') + '</tr></thead><tbody>' +
+    rows.map(r => '<tr>' + cols.map(c => '<td>' + fmt(r[c]) + '</td>').join('') + '</tr>').join('') + '</tbody>';
+}
+
+function showPortfolio(positions, date) {
+  const el = document.getElementById('pview');
+  const dates = Object.keys(positions).sort();
+  let d = dates.filter(x => x <= date).pop() || dates[0];
+  const p = positions[d];
+  const legs = [...(p.puts || []), ...(p.calls || [])];
+  el.innerHTML = '<p class="sub">Showing close of ' + d + '</p><div class="grid">' +
+    [['Cash', p.cash], ['Shares', p.shares], ['Share value', p.share_value], ['Options value', p.option_value], ['NAV', p.nav]]
+      .map(([k, v]) => '<div class="stat"><div class="k">' + k + '</div><div class="v">' + fmt(v) + '</div></div>').join('') + '</div>' +
+    (legs.length ? '<div class="panel" style="margin-top:12px"><table id="t-legs"></table></div>' : '<p class="sub" style="margin-top:12px">No open option positions.</p>');
+  if (legs.length) table(document.getElementById('t-legs'), legs);
+}
+
+(async () => {
+  const [summary, nav, blotter, ledger, positions] = await Promise.all([
+    getJSON('data/summary.json'), getCSV('data/nav.csv'), getCSV('data/blotter.csv'),
+    getCSV('data/ledger.csv'), getJSON('data/positions.json')]);
+
+  const s = summary || {}, c = s.commentary || {}, m = s.meta || {};
+  if (m.synthetic) document.getElementById('synth').style.display = 'block';
+  if (m.ticker) document.getElementById('meta').textContent = `FINTECH 535 · Pau Pinya Nadal · ${m.ticker} · ${m.start} to ${m.end}`;
+  if (m.repo) document.getElementById('repo').href = m.repo;
+  document.getElementById('c-thesis').innerHTML = prose(c.thesis);
+  document.getElementById('c-fills').innerHTML = prose(c.fills);
+  document.getElementById('c-verdict').innerHTML = prose(c.verdict);
+
+  if (s.metrics && s.metrics.length) {
+    table(document.getElementById('metrics'), s.metrics);
+    const w = s.metrics[0];
+    document.getElementById('stats').innerHTML = Object.entries(w).slice(1, 6)
+      .map(([k, v]) => '<div class="stat"><div class="k">' + esc(k) + '</div><div class="v">' + fmt(v) + '</div></div>').join('');
+  } else { document.getElementById('metrics').outerHTML = PENDING; }
+
+  if (nav && nav.length) {
+    const cols = Object.keys(nav[0]).filter(k => k !== 'date');
+    const colors = ['#f2b33d', '#4fd18b', '#6fa8ff', '#ff6b6b'];
+    Plotly.newPlot('nav-chart', cols.map((k, i) => ({ x: nav.map(r => r.date), y: nav.map(r => r[k]), name: k,
+      type: 'scatter', mode: 'lines', line: { width: 3, color: colors[i % 4] } })), LAYOUT, { responsive: true, displaylogo: false });
+  } else { document.getElementById('nav-chart').outerHTML = PENDING; }
+
+  table(document.getElementById('t-blotter'), blotter);
+  table(document.getElementById('t-ledger'), ledger);
+
+  const pd = document.getElementById('pdate');
+  if (positions && Object.keys(positions).length) {
+    const ds = Object.keys(positions).sort();
+    pd.min = ds[0]; pd.max = ds[ds.length - 1]; pd.value = ds[ds.length - 1];
+    showPortfolio(positions, pd.value);
+    pd.addEventListener('change', () => showPortfolio(positions, pd.value));
+  } else { pd.disabled = true; document.getElementById('pview').innerHTML = PENDING; }
+})();
+</script>
+</body>
+</html>
