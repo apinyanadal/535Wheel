@@ -1,0 +1,61 @@
+name: Nightly orders
+
+# Modeled on the class "Nightly OI refresh" (oi-plots.yml).
+# Runs the wheel algorithm, which writes open_orders.json for the next NYSE session.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "run = write orders, diagnose = LSEG connection report only, dry-run = compute but write nothing"
+        type: choice
+        options: [run, diagnose, dry-run]
+        default: run
+  schedule:
+    # 03:00 UTC = 10pm EST / 11pm EDT. Runs every night, like the class workflow.
+    # Weekend runs plan the same Monday session with the same order ids, so they are harmless.
+    - cron: "0 3 * * *"
+
+concurrency:
+  group: nightly-orders
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  orders:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install lseg-data pandas numpy exchange_calendars
+
+      - name: Run algorithm
+        env:
+          LSEG_APP_KEY: ${{ secrets.LSEG_APP_KEY }}
+          LSEG_USERNAME: ${{ secrets.LSEG_USERNAME }}
+          LSEG_PASSWORD: ${{ secrets.LSEG_PASSWORD }}
+          MODE: ${{ github.event.inputs.mode || 'run' }}
+        run: |
+          case "$MODE" in
+            diagnose) python nightly_orders.py --diagnose ;;
+            dry-run)  python nightly_orders.py --dry-run ;;
+            *)        python nightly_orders.py ;;
+          esac
+
+      - name: Commit and push orders
+        # Only our own files. Never price_history.json or positions.json: Sanji owns those.
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Update open orders"
+          file_pattern: "open_orders.json mkt/open_orders.json logs/latest.json logs/decisions.csv"

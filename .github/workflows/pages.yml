@@ -1,0 +1,48 @@
+name: Deploy to GitHub Pages
+
+# Modeled on the class pages.yml. A push made by the nightly job's built-in token
+# does not trigger other workflows, so this one listens for the nightly to finish.
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Nightly orders"]
+    types: [completed]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    # Only deploy if the nightly succeeded (or if this was a push or a manual run)
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        # No ref on purpose. For a workflow_run trigger the default checkout is the newest
+        # commit on main, which includes the orders the nightly just pushed.
+        # (workflow_run.head_sha would be the commit the nightly started from, one night stale.)
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
