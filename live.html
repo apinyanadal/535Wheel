@@ -46,34 +46,27 @@
   details summary { cursor:pointer; color:var(--muted); margin-top:10px; }
   .flow { width:100%; height:auto; display:block; }
   .note { color:var(--muted); font-size:.85rem; }
+  .todo { border:2px dashed var(--amber); border-radius:8px; padding:16px; color:var(--amber); margin-top:12px; }
   footer { color:var(--muted); margin-top:48px; font-size:.85rem; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Closing the Loop: a Live AMZN Wheel</h1>
-  <p class="sub">FINTECH 535 · Alex Pinya Nadal · runs every night at 10pm ET on GitHub Actions ·
-     <a href="index.html">the backtest behind it</a> · <a href="https://github.com/apinyanadal/535Wheel">code</a></p>
-  <nav><a href="#what">What it is</a><a href="#loop">The loop</a><a href="#rules">The algorithm</a>
-       <a href="#tonight">Tonight</a><a href="#strike">Choosing the strike</a><a href="#log">Decision log</a>
-       <a href="#why">Why this strategy</a><a href="#sanji">Built for Sanji</a><a href="#limits">Limitations</a></nav>
+  <p class="sub">FINTECH 535 · Alex Pinya Nadal · updated every night at 10pm ET ·
+     <a href="index.html">backtest</a> · <a href="https://github.com/apinyanadal/535Wheel">code</a></p>
+  <nav><a href="#how">How it works</a><a href="#tonight">Tonight</a><a href="#strike">Choosing the strike</a>
+       <a href="#log">Decision log</a><a href="#why">Why this strategy</a><a href="#reflection">Reflection</a></nav>
   <div class="tiles" id="tiles"></div>
 
-  <h2 id="what">What this is</h2>
+  <h2 id="how">How it works</h2>
   <div class="prose">
-    <p>An algorithm is a function that takes inputs and returns a set of open orders. This page documents one
-       that runs by itself every night. A GitHub Action wakes up at 10pm ET, reads the latest AMZN prices and my
-       current book, pulls this week's AMZN option chain from LSEG, decides what the wheel should do next, and
-       commits the answer as <code>open_orders.json</code> in the root of this repo. Sanji, the course server,
-       reads that file, resolves it against the next session's prices, and writes back the new book. The next
-       night the function runs again on the new book. That is the loop.</p>
-    <p>The strategy is the wheel I backtested on AMZN: sell a 30-delta put each week while holding cash; if it is
-       assigned, sell a 30-delta covered call each week until the shares are called away; then start over. The
-       live version uses exactly the rules and parameters of that backtest, so the evidence on the
-       <a href="index.html">backtest page</a> is evidence for what is running here.</p>
+    <p>Every night at 10pm ET a GitHub Action runs <code>nightly_orders.py</code>. The script reads the AMZN prices
+       and positions that Sanji writes to this repo, pulls this week's AMZN option chain from LSEG, decides what the
+       wheel should do next, and writes the result to <code>open_orders.json</code> in the repo root (plus a copy in
+       <code>mkt/</code>, where the order spec says Sanji reads). Sanji fills the orders against the next session's
+       prices and updates the positions, and the next night's run starts from that new book.</p>
   </div>
-
-  <h2 id="loop">The loop</h2>
   <div class="panel">
     <svg class="flow" viewBox="0 0 1040 300" role="img" aria-label="Loop: Sanji writes prices and positions at 4pm, the nightly GitHub Action reads them at 10pm, pulls LSEG, writes open_orders.json, which Sanji resolves the next session.">
       <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
@@ -108,138 +101,74 @@
       </g>
     </svg>
   </div>
-  <div class="prose" style="margin-top:12px">
-    <p>Two workflows do the work, both modeled on the class examples. <code>nightly.yml</code> runs on the cron
-       <code>0 3 * * *</code> (03:00 UTC is 10pm EST and 11pm EDT), installs Python, runs the script with my LSEG
-       credentials from GitHub secrets, and commits only the files the algorithm owns. <code>pages.yml</code>
-       redeploys this site when the nightly finishes. Sanji owns <code>price_history.json</code> and the
-       positions file; the Action never touches them.</p>
-  </div>
 
-  <h2 id="rules">The algorithm</h2>
+  <h3 id="rules">The rules</h3>
   <div class="panel xscroll"><table class="rules">
-    <thead><tr><th>Book (read from positions.json)</th><th>Next session is the first of its week?</th><th>Order written</th><th>Why</th></tr></thead>
+    <thead><tr><th>Book (from positions.json)</th><th>First session of the week?</th><th>Order written</th></tr></thead>
     <tbody>
-      <tr><td>Cash only</td><td>Yes</td><td>Sell 1 AMZN put, this week's expiry, strike nearest 30-delta, limit order</td><td>Start a wheel cycle: get paid to commit to buying 100 shares below the market</td></tr>
-      <tr><td>Long 100+ shares</td><td>Yes</td><td>Sell 1 call per 100 shares, this week's expiry, strike nearest 30-delta</td><td>We were assigned: collect premium while waiting to be called away</td></tr>
-      <tr><td>A short put or call still open</td><td>Any</td><td>Nothing</td><td>One option at a time. Sanji expires or assigns it at the close</td></tr>
-      <tr><td>Anything</td><td>No</td><td>Nothing</td><td>The backtest only opened options on the week's first session (Monday, or Tuesday after a Monday holiday)</td></tr>
+      <tr><td>Cash only</td><td>Yes</td><td>Sell 1 AMZN put, this week's expiry, strike nearest 30-delta</td></tr>
+      <tr><td>100+ shares</td><td>Yes</td><td>Sell 1 covered call per 100 shares, this week's expiry, strike nearest 30-delta</td></tr>
+      <tr><td>Short put or call still open</td><td>Any</td><td>Nothing</td></tr>
+      <tr><td>Anything</td><td>No</td><td>Nothing</td></tr>
     </tbody></table></div>
   <div class="prose" style="margin-top:12px">
-    <p>Assignment is not an order. Sanji applies it from the closing price: a short put that closes in the money
-       becomes 100 shares, and a short call that closes in the money takes them away. The algorithm only has to read
-       the book Sanji wrote and act on it. Until Sanji starts publishing positions, the script treats the book as
-       cash, so every Monday it plans a fresh put.</p>
+    <p>These are the same rules and parameters as my <a href="index.html">backtest</a>. Assignment is not an order:
+       Sanji applies it at the close. Until Sanji publishes a positions file, the script assumes the book is cash.
+       Every order is checked against the Sanji spec before it is written, and if LSEG or the positions file can't
+       be read, the run stops without writing anything.</p>
   </div>
 
   <h2 id="tonight">Tonight</h2>
   <div class="prose" id="t-reason"></div>
   <div class="two">
     <div class="panel"><h3 style="margin-top:4px">Orders written tonight</h3><div id="t-orders"></div></div>
-    <div class="panel"><h3 style="margin-top:4px">The 30-delta candidates</h3><table class="kv" id="t-cands"></table></div>
+    <div class="panel"><h3 style="margin-top:4px">30-delta candidates</h3><table class="kv" id="t-cands"></table></div>
   </div>
-  <details><summary>Full open_orders.json (every order the algorithm has written)</summary><pre id="t-file"></pre></details>
+  <details><summary>Full open_orders.json</summary><pre id="t-file"></pre></details>
 
   <h2 id="strike">Choosing the strike</h2>
   <div class="prose">
-    <p>Sanji's order language has a <code>delta:30</code> strike token, but Sanji rejects it until the course
-       database stores option chain snapshots, and it rejects <code>mid</code> limit prices for the same reason.
-       So the script does that work itself and writes a fully named contract: an exact expiry date, a plain strike
-       number and a plain limit price. Sanji then only needs that contract's daily bar to resolve it.</p>
+    <p>Sanji's <code>delta:30</code> strike and <code>mid</code> price tokens can't be resolved yet, so the script works
+       out the contract itself and writes an exact expiry, strike and limit price:</p>
     <ol>
-      <li><b>Find this week's expiry.</b> LSEG discovery search lists the AMZN options expiring in the week of the
-          next session; the script takes the last one in that week (normally Friday; Thursday when Friday is a holiday).</li>
-      <li><b>Get last night's quotes.</b> Bid and ask at the prior close for out-of-the-money puts (85% to 102% of spot)
-          and calls (98% to 115%). Mid = (bid + ask) / 2, the same fill assumption as the backtest.</li>
-      <li><b>Back out implied volatility.</b> Solve Black-Scholes for the vol that reproduces the mid, with time measured
-          from the quote date: <span class="math">T<sub>quote</sub> = (expiry − quote date) / 365</span>,
-          r = 3.75%, no dividend.</li>
-      <li><b>Re-value at the order session.</b> With that vol and the last close as spot, compute delta and a model
-          price with <span class="math">T<sub>trade</sub> = (expiry − order date) / 365</span>. This is how the backtest
-          measured delta (on the entry day), and it removes the weekend's time decay that a Friday quote still contains.</li>
-      <li><b>Pick and price.</b> The out-of-the-money strike whose |delta| is closest to 0.30 (ties go further out of the
-          money, Sanji's own tie rule). The limit is that model price rounded down to the cent.</li>
+      <li>Take the last listed AMZN expiry in the week of the order (normally Friday).</li>
+      <li>Get each option's bid and ask at the prior close from LSEG and take the mid.</li>
+      <li>Solve Black-Scholes for the implied vol that matches the mid (r = 3.75%, time from the quote date).</li>
+      <li>Recompute delta and price with time measured from the order date, as the backtest did.</li>
+      <li>Sell the out-of-the-money strike with |delta| closest to 0.30, with the limit at that model price.</li>
     </ol>
-    <p>The limit works as a floor, not a target. Under Sanji's rules a sell limit fills at the open whenever the open is
-       already at or above the limit, so on a normal Monday the put is sold at its opening price. The limit only stops a
-       sale when the option opens far below what last night's chain implied.</p>
+    <p>A sell limit fills at the open whenever the open is above it, so the limit acts as a floor: normally the
+       option is sold at Monday's opening price.</p>
   </div>
   <div class="panel"><div id="c-chain" class="chart"></div></div>
-  <p class="note">Tonight's chain after step 4: absolute delta by strike. Dashed line is the 0.30 target; the labeled
-     points are the strikes the algorithm would sell. Hover any point for its bid, ask, implied vol and limit.</p>
   <details><summary>Chain table</summary><div class="panel scroll"><table id="t-chain"></table></div></details>
 
   <h2 id="log">Decision log</h2>
-  <div class="prose"><p>One row per planned session, written by the nightly run. Weekend runs plan the same Monday,
-     so they replace that row instead of adding new ones. <a href="logs/decisions.csv">decisions.csv</a></p></div>
+  <div class="prose"><p>One row per planned session (<a href="logs/decisions.csv">decisions.csv</a>).</p></div>
   <div class="panel"><div id="c-price" class="chart"></div></div>
-  <p class="note">AMZN daily close from <code>price_history.json</code> (Sanji's IBKR bars) with the 30-delta put and
-     call strikes the algorithm priced each night.</p>
   <div class="panel scroll xscroll"><table id="t-log"></table></div>
 
   <h2 id="why">Why this strategy</h2>
-  <div class="prose">
-    <p><b>Why the wheel.</b> It is the options strategy that most needs the loop. Every decision depends on the book:
-       whether we hold cash, shares, or an open option. A strategy that ignores positions would just print a signal;
-       this one reads what Sanji says happened and reacts, including to assignment, which only the server can apply.</p>
-    <p><b>Why AMZN and 30-delta weekly.</b> Because that is what I backtested from January 2024 to October 2026 with
-       LSEG option data, so the parameters were fixed before this live version existed. Sanji seeded this repo with
-       AAPL at random; I added AMZN's conid to <code>price_history.json</code> so Sanji tracks it too.</p>
-    <p><b>What the backtest says, honestly.</b> The wheel delivered lower risk, not higher return. It trailed both AMZN
-       buy-and-hold and SPY on return and on Sharpe, but with lower volatility (13% against 18%) and a smaller maximum
-       drawdown (-13% against -18%). It behaves like a smaller, smoother AMZN. The point of this assignment is the machinery, and the backtest is what keeps the
-       live rules honest.</p>
+  <!-- PLACEHOLDER 1: replace the whole <div class="todo"> below with your own <p>...</p> paragraphs. -->
+  <div class="todo">
+    <b>Okay so, I chose this strategy first of all because the token i shared with the professor was from my wheel repo. I believe the wheel is ideal since every decision depends on what i already hold. With the cash we sell a put, after assignment we sell calls, and while the option is open we wait. This all fits well with how Sanji is designed. I kept my strategy from the wheel intact, since i had already worked through the parameters and reasoning. </b>
   </div>
-  <div class="panel xscroll"><table id="t-metrics"></table></div>
-  <p class="note">From the <a href="index.html">backtest page</a> (<a href="metrics.csv">metrics.csv</a>).
+  <div class="panel xscroll" style="margin-top:12px"><table id="t-metrics"></table></div>
+  <p class="note">Backtest results, January 2024 to October 2026 (<a href="index.html">backtest page</a>).
      GMRR is the geometric mean annual return; Sharpe uses r = 3.75%.</p>
 
-  <h2 id="sanji">Built for Sanji</h2>
-  <div class="prose"><ul>
-    <li><b>The right session date.</b> <code>for</code> is the first NYSE session strictly after the run date, from
-        <code>exchange_calendars</code>. Friday night plans Monday; the night before Thanksgiving plans the half-day
-        Friday. A manual run during market hours never plans a session that has already opened.</li>
-    <li><b>Safe to rerun.</b> Order ids are built from the session date (<code>amzn-csp-2026-11-23</code>), so the
-        Saturday and Sunday runs rewrite the same order instead of adding new ones. Old orders stay in the file:
-        Sanji ignores ids it already filled and dates already past, so keeping them costs nothing and means a
-        late-resolving order is never deleted.</li>
-    <li><b>Validated before it is written.</b> Every order is checked against the spec on the order page: allowed
-        fields, required fields, expiry and strike tokens, market versus limit rules, unique ids, and that the session
-        is a real NYSE trading day. It also enforces two wheel rules: never buy back or sell what the book does not
-        hold, and never sell a call that is not covered by shares.</li>
-    <li><b>Fails loudly.</b> If LSEG is unreachable, quotes are missing, or the positions file has a shape the script
-        cannot read, the run stops with a red X in GitHub and writes nothing. A stale or misread book is worse than a
-        skipped night.</li>
-    <li><b>Both file locations.</b> The assignment asks for <code>open_orders.json</code> at the repo root; the order
-        page says Sanji reads <code>mkt/open_orders.json</code>. The script writes the same file to both.</li>
-    <li><b>Fresh deploys.</b> The class Pages workflow checks out <code>workflow_run.head_sha</code>, which is the
-        commit the nightly started from, not the one it pushed. This repo checks out the latest commit instead, so the
-        site shows tonight's orders and not last night's.</li>
-  </ul></div>
+  <h2 id="reflection">Reflection</h2>
+  <!-- PLACEHOLDER 2: replace the whole <div class="todo"> below with your own <p>...</p> paragraphs. -->
+  <div class="todo">
+    <b>Sanji doesn’t fill orders yet, so there is no live P&L, and the script treats the book as cash until a positions file appears. Let's wait and see what happens. The strike is also picked from Friday’s close, so a weekend gap can move it away from 30-delta. To improve I would ideally I would use Sanji's delta, so the strike is picked based on MOnday's open, and skip weeks that have earnings calls like we saw in the last backtest.</b>
+  </div>
 
-  <h2 id="limits">Limitations</h2>
-  <div class="prose"><ul>
-    <li><b>Sanji does not resolve orders yet.</b> Until it does, there are no fills, no positions file and no live
-        P&amp;L. The algorithm is written for the book it will receive; the positions parser stops rather than guesses
-        if the real format differs from what it expects.</li>
-    <li><b>Strikes come from last night's close.</b> If AMZN gaps over the weekend, Monday's "30-delta" strike can
-        be well away from 30 delta at the open. Sanji's <code>delta:30</code> token measured at the open would fix this once it is enabled.</li>
-    <li><b>The limit is a loose floor.</b> Measuring time in calendar days counts the whole weekend as decay, so the
-        model price sits well below Friday's mid. That makes fills likely, matching the backtest, which never skipped a week,
-        but it only protects against an option that opens far too cheap.</li>
-    <li><b>No buying-power check.</b> Sanji does not check cash, and neither does the script; it always sells one put,
-        which needs about 100 times the strike in cash.</li>
-    <li><b>Same weaknesses as the backtest.</b> Capped upside in rallies and full downside below the strike. The
-        backtest shows the cost: lower return than simply holding AMZN.</li>
-  </ul></div>
-  <h3>Files</h3>
-  <div class="prose"><p>
+  <p class="note" style="margin-top:32px">Files:
     <a href="https://github.com/apinyanadal/535Wheel/blob/main/nightly_orders.py">nightly_orders.py</a> ·
     <a href="https://github.com/apinyanadal/535Wheel/blob/main/.github/workflows/nightly.yml">nightly.yml</a> ·
     <a href="https://github.com/apinyanadal/535Wheel/blob/main/.github/workflows/pages.yml">pages.yml</a> ·
-    <a href="open_orders.json">open_orders.json</a> · <a href="logs/latest.json">latest.json</a> ·
-    <a href="logs/decisions.csv">decisions.csv</a> ·
-    <a href="https://jakevestal.github.io/server-logic-533/order.html">Sanji order spec</a></p></div>
+    <a href="open_orders.json">open_orders.json</a> ·
+    <a href="https://jakevestal.github.io/server-logic-533/order.html">Sanji order spec</a></p>
 
   <footer>Data: Sanji (IBKR daily bars), LSEG option chain · Alex Pinya Nadal · <span id="built"></span></footer>
 </div>
@@ -277,7 +206,7 @@ function table(id, rows, cols, fmt){
     rows.map(r=>'<tr>'+cols.map(c=>{ const v = fmt ? fmt(c, r[c]) : r[c];
       return '<td'+(c==='reason'?' class="why"':'')+'>'+esc(v)+'</td>'; }).join('')+'</tr>').join('')+'</tbody>';
 }
-function pending(id, msg){ document.getElementById(id).innerHTML = '<div class="pending">'+esc(msg)+'</div>'; }
+function pending(id, msg){ const el=document.getElementById(id); el.style.height='auto'; el.innerHTML = '<div class="pending">'+esc(msg)+'</div>'; }
 function tiles(pairs){ document.getElementById('tiles').innerHTML = pairs.map(([k,v])=>
   '<div class="tile"><div class="k">'+esc(k)+'</div><div class="v">'+esc(v)+'</div></div>').join(''); }
 
@@ -360,7 +289,7 @@ function tiles(pairs){ document.getElementById('tiles').innerHTML = pairs.map(([
     Plotly.newPlot('c-price', tr, L({title:{text:'AMZN close and the strikes priced each night', font:{size:14}},
       yaxis:{title:'Price ($)', gridcolor:GRID, zeroline:false}, xaxis:{gridcolor:GRID, zeroline:false}}), CFG);
   } else {
-    pending('c-price', 'Waiting for Sanji to backfill AMZN bars into price_history.json.');
+    pending('c-price', 'The AMZN price chart appears after Sanji\'s next daily price update (4pm ET).');
   }
 
   // ---------------- backtest metrics
