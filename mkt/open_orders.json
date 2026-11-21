@@ -8,8 +8,8 @@
     "underlying": 3691937,
     "contract": "put",
     "expiry": "2026-11-27",
-    "strike": 252.5,
+    "strike": 240,
     "ref": "open",
-    "lmt_prc": 2.41
+    "lmt_prc": 2.93
   }
 ]

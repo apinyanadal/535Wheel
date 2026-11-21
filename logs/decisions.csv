@@ -1,2 +1,2 @@
 for,run_at_et,last_session,first_of_week,state,action,spot,expiry,put_strike,put_delta,put_limit,call_strike,call_delta,call_limit,order_id,reason
-2026-11-23,2026-11-20 09:43,2026-11-19,True,CASH,put,257.37,2026-11-27,252.5,-0.3206,2.41,262.5,0.3285,2.25,amzn-csp-2026-11-23,book is cash; write a cash-secured put
+2026-11-23,2026-11-21 05:48,2026-11-20,True,CASH,put,246.82,2026-11-27,240.0,-0.3049,2.93,255.0,0.2727,2.05,amzn-csp-2026-11-23,book is cash; write a cash-secured put
