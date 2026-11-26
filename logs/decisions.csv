@@ -2,4 +2,4 @@ for,run_at_et,last_session,first_of_week,state,action,spot,expiry,put_strike,put
 2026-11-23,2026-11-22 05:56,2026-11-20,True,CASH,put,246.82,2026-11-27,240.0,-0.3049,2.93,255.0,0.2727,2.05,amzn-csp-2026-11-23,book is cash; write a cash-secured put
 2026-11-24,2026-11-23 07:02,2026-11-20,False,CASH,none,246.82,2026-11-27,240.0,-0.2813,2.26,252.5,0.3158,2.2,,not the first session of the week; the wheel only opens options on the week's first session
 2026-11-25,2026-11-24 08:28,2026-11-23,False,CASH,none,255.39,2026-11-27,252.5,-0.3515,1.95,260.0,0.2821,1.31,,not the first session of the week; the wheel only opens options on the week's first session
-2026-11-27,2026-11-25 07:24,2026-11-24,False,CASH,none,252.29,2026-12-04,245.0,-0.3018,3.07,262.5,0.2444,1.92,,not the first session of the week; the wheel only opens options on the week's first session
+2026-11-27,2026-11-26 07:06,2026-11-25,False,CASH,none,244.43,2026-12-04,237.5,-0.313,3.3,252.5,0.2982,2.55,,not the first session of the week; the wheel only opens options on the week's first session
