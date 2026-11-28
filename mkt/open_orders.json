@@ -21,8 +21,8 @@
     "underlying": 3691937,
     "contract": "put",
     "expiry": "2026-12-04",
-    "strike": 237.5,
+    "strike": 247.5,
     "ref": "open",
-    "lmt_prc": 2.0
+    "lmt_prc": 1.94
   }
 ]
